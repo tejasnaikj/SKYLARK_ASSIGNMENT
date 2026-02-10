@@ -1,0 +1,9 @@
+streamlit
+pandas
+gspread
+oauth2client
+langchain
+langchain-openai
+langchain-community
+tabulate
+openai
