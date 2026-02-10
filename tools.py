@@ -1,58 +1,75 @@
-from langchain.tools import tool
 from db_utils import fetch_data, get_client, SHEET_URL
-import pandas as pd
 from datetime import datetime
+import re
 
-@tool
-def get_pilot_roster(filter_skill: str = None):
-    """
-    Returns the list of pilots. 
-    Use this to check who is available or what skills they have.
-    """
+# -----------------------------
+# Normalize column names
+# -----------------------------
+def normalize(df):
+    df.columns = [c.lower().strip() for c in df.columns]
+    return df
+
+
+# -----------------------------
+# GET PILOT ROSTER
+# -----------------------------
+def get_pilot_roster(filter_skill=None, only_available=False):
     df = fetch_data("Pilots")
+    df = normalize(df)
+
+    # availability filter ONLY when explicitly asked
+    if only_available:
+        df = df[df['status'].str.lower() == 'available']
+
+    # skill filter
     if filter_skill:
         df = df[df['skills'].str.contains(filter_skill, case=False, na=False)]
-    return df.to_markdown(index=False)
 
-@tool
-def check_conflicts(pilot_id: str, date_check: str):
-    """
-    Checks if a pilot is free on a specific date.
-    date_check format: 'YYYY-MM-DD'
-    """
-    # Check if pilot exists/is on leave
+    if df.empty:
+        return "No matching pilots found."
+
+    # RETURN DATAFRAME (not text)
+    return df[['pilot_id','name','skills','location','status']]
+
+
+
+
+# -----------------------------
+# CHECK CONFLICTS
+# -----------------------------
+def check_conflicts(pilot_id, date_check):
+
     pilots = fetch_data("Pilots")
-    pilot = pilots[pilots['id'] == pilot_id]
-    if pilot.empty: return "Pilot not found."
-    if pilot.iloc[0]['status'] == 'On Leave': return "CONFLICT: Pilot is On Leave."
+    pilots = normalize(pilots)
 
-    # Check missions
-    missions = fetch_data("Missions")
-    pilot_missions = missions[missions['assigned_pilot_id'] == pilot_id]
+    pilot = pilots[pilots['pilot_id'] == pilot_id]
 
-    check_dt = datetime.strptime(date_check, "%Y-%m-%d")
+    if pilot.empty:
+        return "Pilot not found."
 
-    for _, m in pilot_missions.iterrows():
-        start = datetime.strptime(m['start_date'], "%Y-%m-%d")
-        end = datetime.strptime(m['end_date'], "%Y-%m-%d")
-        if start <= check_dt <= end:
-            return f"CONFLICT: Pilot assigned to Mission {m['id']}"
+    if pilot.iloc[0]['status'].lower() == 'on leave':
+        return "CONFLICT: Pilot is On Leave."
+
+    if pilot.iloc[0]['status'].lower() == 'assigned':
+        return f"CONFLICT: Pilot assigned to {pilot.iloc[0]['current_assignment']}"
 
     return "No conflicts. Pilot is free."
 
-@tool
-def update_pilot_status(pilot_id: str, new_status: str):
-    """
-    Updates a pilot's status (Available, On Leave, Assigned).
-    Only use this if the user explicitly asks to change status.
-    """
+
+# -----------------------------
+# UPDATE STATUS
+# -----------------------------
+def update_pilot_status(pilot_id, new_status):
+
     client = get_client()
     sheet = client.open_by_url(SHEET_URL).worksheet("Pilots")
 
     cell = sheet.find(pilot_id)
-    if not cell: return "Pilot ID not found."
 
-    # Status is column 5 (E)
-    sheet.update_cell(cell.row, 5, new_status) 
+    if not cell:
+        return "Pilot ID not found."
+
+    # status column is F (6)
+    sheet.update_cell(cell.row, 6, new_status)
+
     return f"Updated {pilot_id} to {new_status}"
-    

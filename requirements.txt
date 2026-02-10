@@ -1,9 +1,5 @@
 streamlit
-pandas
+openai
 gspread
 oauth2client
-langchain
-langchain-openai
-langchain-community
-tabulate
-openai
+pandas

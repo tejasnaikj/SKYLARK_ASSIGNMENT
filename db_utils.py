@@ -3,20 +3,18 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import streamlit as st
 
-# Constants
-# REPLACE THIS WITH YOUR ACTUAL GOOGLE SHEET URL
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1hwcBQkniPfC_YEsw7Bpi_fLSC-AB7EVmRUOJ2vXEjlo/edit?gid=1229153156#gid=1229153156"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1hwcBQkniPfC_YEsw7Bpi_fLSC-AB7EVmRUOJ2vXEjlo/edit?gid=0#gid=0"
 
 def get_client():
-    # We use st.secrets for cloud deployment, but fallback to local json for testing
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
 
     try:
-        # Try loading from Streamlit secrets (Production)
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     except:
-        # Fallback to local file (Local Development)
         creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
 
     return gspread.authorize(creds)
